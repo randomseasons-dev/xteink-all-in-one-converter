@@ -1,3 +1,7 @@
+# Ver 1.6.2 changelog:
+- **Fixed: Dithered wallpapers looked washed out on CrossPoint 2.0.** CrossPoint 2.0 re-dithers any sleep picture that is not a 1- or 2-bit BMP, which made our 8-bit wallpapers lighter. Dithered wallpapers are now saved as **2-bit BMPs** holding exactly the 4 screen grays, so CrossPoint 2.0 shows them as previewed with no re-processing. They also show correctly on CrossPoint 1.6.x. Re-convert wallpapers made with 1.6.1.
+- Note: many PC photo viewers can't open 2-bit BMPs. Use the app's preview to check them; the device reads them fine.
+
 # Ver 1.6.1 changelog (important bug fixes):
 - **Fixed: Landscape-mode .xtch files showed wrongly cut pages on Crosspoint firmware.** Landscape pages were stored as 800×480, but Crosspoint firmwares always draw pages in portrait at the screen size. Every page is now stored at the screen size (480×800, X3 528×792), with landscape pages turned 90° — read them with the device turned to the left (counter-clockwise). Portrait output is unchanged. Re-convert old landscape files.
 - **Fixed: Wallpapers looked washed out on the sleep screen.** CrossPoint re-sorted our grays one shade lighter. Dithered wallpapers are now saved with exactly the 4 screen grays (8-bit BMP), so the device shows them as previewed; undithered wallpapers are darkened to match each device's gray levels.

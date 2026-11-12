@@ -108,13 +108,14 @@ pub fn render_bmp(path: &Path, s: &WallpaperSettings) -> Result<Vec<u8>, String>
 
 /// CrossPoint re-quantizes high-colour BMPs with its own cut-offs, which shifts our grays a
 /// level lighter. So:
-/// - dithered: an 8-bit BMP whose palette is exactly the 4 screen grays — CrossPoint treats
-///   it as native and maps each pixel straight to its level (no cut-offs, no re-dither);
+/// - dithered: a 2-bit BMP whose palette is exactly the 4 screen grays. CrossPoint 1.6.x maps
+///   each pixel straight to its level, and CrossPoint 2.0 draws a screen-sized BMP of <= 2 bits
+///   as-is (an 8-bit one is re-dithered there, washing it out) — no cut-offs, no re-dither;
 /// - plain gray: a 24-bit BMP tone-mapped so the device's cut-offs split it like an even
 ///   4-level quantization would (X4 uses even cut-offs; X4 Pro/X3 the legacy 30/55/150).
 pub fn encode_for_device(g: &GrayImage, s: &WallpaperSettings) -> Vec<u8> {
     if s.dither {
-        return encode_bmp8_4gray(g);
+        return encode_bmp2_4gray(g);
     }
     match s.device {
         Device::X4 => encode_bmp24(g),
@@ -139,11 +140,12 @@ pub fn encode_for_device(g: &GrayImage, s: &WallpaperSettings) -> Vec<u8> {
     }
 }
 
-/// Uncompressed 8-bit palettized BMP with a 4-entry palette {0, 85, 170, 255}; pixels must
-/// already be on those levels (the dithered output is).
-pub fn encode_bmp8_4gray(g: &GrayImage) -> Vec<u8> {
+/// Uncompressed 2-bit palettized BMP with a 4-entry palette {0, 85, 170, 255}; pixels must
+/// already be on those levels (the dithered output is). Four pixels per byte, leftmost pixel
+/// in the high bits; rows padded to 4 bytes; bottom-up.
+pub fn encode_bmp2_4gray(g: &GrayImage) -> Vec<u8> {
     let (w, h) = (g.width() as usize, g.height() as usize);
-    let row = (w + 3) & !3; // rows padded to 4 bytes
+    let row = ((w + 3) / 4 + 3) & !3; // 4 px per byte, rows padded to 4 bytes
     let data_off = 54 + 4 * 4;
     let data_len = row * h;
     let mut out = Vec::with_capacity(data_off + data_len);
@@ -155,7 +157,7 @@ pub fn encode_bmp8_4gray(g: &GrayImage) -> Vec<u8> {
     out.extend_from_slice(&(w as i32).to_le_bytes());
     out.extend_from_slice(&(h as i32).to_le_bytes()); // positive = bottom-up rows
     out.extend_from_slice(&1u16.to_le_bytes()); // planes
-    out.extend_from_slice(&8u16.to_le_bytes()); // bits per pixel
+    out.extend_from_slice(&2u16.to_le_bytes()); // bits per pixel
     out.extend_from_slice(&0u32.to_le_bytes()); // BI_RGB (no compression)
     out.extend_from_slice(&(data_len as u32).to_le_bytes());
     out.extend_from_slice(&2835i32.to_le_bytes()); // 72 DPI
@@ -165,13 +167,15 @@ pub fn encode_bmp8_4gray(g: &GrayImage) -> Vec<u8> {
     for v in [0u8, 85, 170, 255] {
         out.extend_from_slice(&[v, v, v, 0]); // B, G, R, reserved
     }
-    let pad = row - w;
+    let mut line = vec![0u8; row];
     for y in (0..h).rev() {
+        line.iter_mut().for_each(|b| *b = 0);
         for x in 0..w {
             let v = g.get_pixel(x as u32, y as u32).0[0] as u32;
-            out.push(((v + 42) / 85).min(3) as u8); // palette index of the nearest level
+            let idx = ((v + 42) / 85).min(3) as u8; // palette index of the nearest level
+            line[x / 4] |= idx << (6 - (x % 4) * 2);
         }
-        out.extend(std::iter::repeat(0u8).take(pad));
+        out.extend_from_slice(&line);
     }
     out
 }

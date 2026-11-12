@@ -1,6 +1,6 @@
 [package]
 name = "xteink"
-version = "1.6.1"
+version = "1.6.2"
 description = "xteink all-in-one converter"
 authors = ["you"]
 edition = "2021"
